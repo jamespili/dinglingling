@@ -6,88 +6,145 @@
     <title>系统任务</title>
     <style>
         :root { --ios-red: #ff3b30; --ios-green: #34c759; --bg-color: #000; }
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: -apple-system, sans-serif; background: var(--bg-color); color: white; overflow: hidden; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-color); color: white; overflow: hidden; }
         
-        /* 剧本区 */
-        #script-panel { padding: 15px; background: #1c1c1e; border-bottom: 1px solid #333; font-size: 0.9rem; }
+        /* 顶部选项区 - 保持不动 */
+        #top-panel { padding: 15px; background: #1c1c1e; border-bottom: 1px solid #333; }
+        .mode-selector { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .mode-btn { background: #333; color: #fff; border: 1px solid #555; padding: 5px 10px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; }
+        .mode-btn.active { background: #007aff; border-color: #007aff; }
+        #script-body { font-size: 0.85rem; line-height: 1.4; color: #ccc; }
         .highlight { color: #ffbc05; font-weight: bold; }
-        #toggle-script { background: #444; color: #fff; border: none; padding: 4px 12px; border-radius: 10px; margin-bottom: 8px; }
 
         /* 主控区 */
-        #setup-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 70%; text-align: center; }
-        .rescue-btn { width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, #ff4b2b, #ff416c); border: none; color: white; font-size: 1.2rem; font-weight: bold; box-shadow: 0 0 20px rgba(255,75,43,0.3); }
-        #timer { margin-top: 20px; color: #888; }
+        #setup-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60%; text-align: center; }
+        .rescue-btn { width: 110px; height: 110px; border-radius: 50%; background: linear-gradient(135deg, #ff4b2b, #ff416c); border: none; color: white; font-size: 1.2rem; font-weight: bold; }
+        #timer { margin-top: 20px; color: #888; font-family: monospace; }
 
-        /* 全屏来电 */
-        #call-screen { position: fixed; top:0; left:0; width:100%; height:100%; background: linear-gradient(to bottom, #2c3e50, #000); z-index: 100; display: none; flex-direction: column; align-items: center; justify-content: space-between; padding: 80px 0; box-sizing: border-box; }
+        /* 通用全屏遮罩 */
+        .full-screen { position: fixed; top:0; left:0; width:100%; height:100%; z-index: 100; display: none; flex-direction: column; align-items: center; box-sizing: border-box; }
+
+        /* [界面一] iPhone 来电界面 */
+        #call-screen { background: linear-gradient(to bottom, #2c3e50, #000); justify-content: space-between; padding: 80px 0 100px 0; }
+        
+        /* [界面二] iPhone 通话中界面 (核心重做) */
+        #incall-screen { background: #1a1a1a; justify-content: space-between; padding: 60px 0 80px 0; }
+        .incall-timer { color: #fff; font-size: 1.1rem; opacity: 0.9; margin-top: 8px; font-variant-numeric: tabular-nums; }
+        
+        /* iPhone 标志性 3x2 按钮矩阵 */
+        .incall-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; padding: 0 45px; width: 100%; box-sizing: border-box; margin-top: 20px; }
+        .grid-item { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .icon-circle { 
+            width: 72px; height: 72px; border-radius: 50%; 
+            background: rgba(255,255,255,0.12); 
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 1.4rem; backdrop-filter: blur(10px);
+        }
+        .grid-item span { font-size: 0.75rem; color: #fff; opacity: 0.9; }
+
+        /* 顶部联系人信息 */
         .caller-info { text-align: center; }
-        .caller-info h2 { font-size: 2.2rem; margin: 0; }
-        .call-ui-bottom { width: 100%; display: flex; justify-content: space-around; padding-bottom: 40px; }
-        .btn-circle { width: 75px; height: 75px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
+        .caller-info h2 { font-size: 2.2rem; margin: 0; font-weight: 400; letter-spacing: -1px; }
+        .caller-info p { color: #ccc; margin-top: 10px; font-size: 1.1rem; }
+
+        /* 底部操作 */
+        .call-ui-bottom { width: 100%; display: flex; justify-content: space-around; }
+        .btn-circle { width: 78px; height: 78px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; cursor: pointer; }
         .decline { background: var(--ios-red); }
         .accept { background: var(--ios-green); }
-        .hidden { display: none; }
+        .hangup { background: var(--ios-red); margin-top: 30px; } /* 挂断按钮 */
+
+        /* 微信/iPhone 辅助文字 */
+        .sub-text { font-size: 0.8rem; margin-top: 10px; text-align: center; color: #fff; opacity: 0.8; }
     </style>
 </head>
 <body>
 
-    <div id="script-panel">
-        <button id="toggle-script" onclick="toggleScript()">隐藏剧本 ▴</button>
-        <div id="acting-script">
-        <div class="script-step">❶ <span class="highlight">皱眉：</span>盯住屏幕2秒，表现出无奈。</div>
-        <div class="script-step">❷ <span class="highlight">眼神：</span>抬头看一眼对方，眼神无辜。</div>
-        <div class="script-step">❸ <span class="highlight">台词：</span>“真不好意思，老总打来的，我得找个安静的地方回一下。你们先吃，不用等我了。”</div>
-        <div class="script-step">❹ <span class="highlight">撤离：</span>拿包，起身，边接听边快步走开。</div>
-    </div>
+    <div id="top-panel">
+        <div class="mode-selector">
+            <button class="mode-btn active" onclick="changeMode('老板', '真不好意思，老总打来的紧急电话，我得回一下。你们先吃！')">职场模式</button>
+            <button class="mode-btn" onclick="changeMode('家里老头子', '哎呀，家里打来的，估计有急事，我得回个电话看看，抱歉！')">家庭模式</button>
+            <button class="mode-btn" onclick="changeMode('158-9921-0428', '不好意思，我车好像挡着人家了，我赶紧去处理下，回见！')">挪车/快递</button>
+            <button class="mode-btn" onclick="changeMode('【 紧急呼叫 】', '抱歉，有个预约电话等一天了，我得接一下。')">抽象模式</button>
+        </div>
+        <div id="script-body">
+            <div>❶ <span class="highlight">皱眉叹气</span> ❷ <span class="highlight">无辜眼神</span> ❸ <span class="highlight">台词撤离</span></div>
+            <div id="current-script" style="margin-top:5px; color:#fff;">“真不好意思，老总打来的紧急电话，我得回一下。你们先吃！”</div>
+        </div>
     </div>
 
     <div id="setup-screen">
         <button id="start-btn" class="rescue-btn" onclick="startCountdown()">救 我</button>
-        <div id="timer">点击后 1 分钟模拟来电</div>
+        <div id="timer">T-MINUS 60s</div>
     </div>
 
-    <div id="call-screen">
+    <div id="call-screen" class="full-screen">
         <div class="caller-info">
-            <h2 id="display-name">老板</h2>
-            <p>WeChat Audio...</p>
+            <h2 class="dynamic-name">老板</h2>
+            <p>移动电话</p>
         </div>
         <div class="call-ui-bottom">
-            <div onclick="reset()"><div class="btn-circle decline">✕</div><p style="font-size:0.8rem; text-align:center;">拒绝</p></div>
-            <div onclick="pickUp()"><div class="btn-circle accept">✓</div><p style="font-size:0.8rem; text-align:center;">接听</p></div>
+            <div>
+                <div class="btn-circle decline" onclick="reset()">✕</div>
+                <div class="sub-text">拒绝</div>
+            </div>
+            <div>
+                <div class="btn-circle accept" onclick="pickUp()">✓</div>
+                <div class="sub-text">接听</div>
+            </div>
         </div>
     </div>
 
-    <audio id="ringtone" loop preload="auto">
-        <source src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3" type="audio/mpeg">
-    </audio>
-    <audio id="hello-voice" preload="auto">
-        <source src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3" type="audio/mpeg">
-    </audio>
+    <div id="incall-screen" class="full-screen">
+        <div class="caller-info">
+            <h2 class="dynamic-name" style="font-size: 1.8rem;">老板</h2>
+            <div class="incall-timer" id="call-duration">00:01</div>
+        </div>
+        
+        <div class="incall-grid">
+            <div class="grid-item"><div class="icon-circle">🔇</div><span>静音</span></div>
+            <div class="grid-item"><div class="icon-circle">⌨️</div><span>键盘</span></div>
+            <div class="grid-item"><div class="icon-circle">🔊</div><span>免提</span></div>
+            <div class="grid-item"><div class="icon-circle">➕</div><span>添加通话</span></div>
+            <div class="grid-item"><div class="icon-circle">🎞️</div><span>FaceTime</span></div>
+            <div class="grid-item"><div class="icon-circle">👤</div><span>通讯录</span></div>
+        </div>
+
+        <div onclick="reset()">
+            <div class="btn-circle hangup">✕</div>
+        </div>
+    </div>
+
+    <audio id="ringtone" loop src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3"></audio>
+    <audio id="hello-voice" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3"></audio>
 
     <script>
+        let durationTimer;
         const ringtone = document.getElementById('ringtone');
         const helloVoice = document.getElementById('hello-voice');
         const callScreen = document.getElementById('call-screen');
+        const incallScreen = document.getElementById('incall-screen');
         const timerText = document.getElementById('timer');
+        const currentScript = document.getElementById('current-script');
 
-        // 预加载提示：在页面第一次点击时，解锁所有音频权限
-        document.body.addEventListener('click', function() {
+        // 解锁音频权限
+        document.body.addEventListener('click', () => {
             ringtone.load();
             helloVoice.load();
         }, { once: true });
 
-        function toggleScript() {
-            const body = document.getElementById('script-body');
-            const btn = document.getElementById('toggle-script');
-            body.classList.toggle('hidden');
-            btn.innerText = body.classList.contains('hidden') ? "显示剧本 ▾" : "隐藏剧本 ▴";
+        function changeMode(name, script) {
+            document.querySelectorAll('.dynamic-name').forEach(el => el.innerText = name);
+            currentScript.innerText = `“${script}”`;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if(btn.innerText.includes(name.substring(0,2)) || (name.includes('-') && btn.innerText.includes('挪车'))) btn.classList.add('active');
+            });
         }
 
         function startCountdown() {
-            let timeLeft = 60; 
+            let timeLeft = 60;
             document.getElementById('start-btn').disabled = true;
-            document.getElementById('start-btn').style.opacity = "0.5";
-            
             const countdown = setInterval(() => {
                 timeLeft--;
                 timerText.innerText = `准备中：${timeLeft}s`;
@@ -99,38 +156,41 @@
         }
 
         function triggerCall() {
-            // 尝试播放铃声
-            const playPromise = ringtone.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(error => {
-                    alert("请点击页面任意位置以激活声音权限！");
-                });
-            }
+            ringtone.play().catch(() => {});
             callScreen.style.display = 'flex';
+            if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
         }
 
         function pickUp() {
-            // 1. 立即停止铃声
             ringtone.pause();
-            ringtone.currentTime = 0;
+            callScreen.style.display = 'none';
+            incallScreen.style.display = 'flex'; 
             
-            // 2. 核心修复：立即在点击事件中调用 play()
-            // 模拟贴耳动作：延迟 800 毫秒后发出“喂”的声音
-            setTimeout(() => {
-                helloVoice.play().catch(e => console.log("音频播放失败", e));
-            }, 800);
+            // 播放灵魂“喂”
+            setTimeout(() => { helloVoice.play().catch(() => {}); }, 700);
 
-            // 3. 5秒后自动重置页面，防止穿帮
-            setTimeout(() => { reset(); }, 5000);
+            // 开启 iPhone 风格计时器
+            let sec = 0;
+            durationTimer = setInterval(() => {
+                sec++;
+                let m = Math.floor(sec/60).toString().padStart(2, '0');
+                let s = (sec%60).toString().padStart(2, '0');
+                document.getElementById('call-duration').innerText = `${m}:${s}`;
+            }, 1000);
+
+            // 10秒后自动彻底隐藏（模拟你已经挂电话放兜里了）
+            setTimeout(() => { reset(); }, 10000);
         }
 
         function reset() {
+            clearInterval(durationTimer);
             ringtone.pause();
             helloVoice.pause();
             callScreen.style.display = 'none';
-            timerText.innerText = "撤离成功。";
+            incallScreen.style.display = 'none';
+            if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+            timerText.innerText = "已就绪";
             document.getElementById('start-btn').disabled = false;
-            document.getElementById('start-btn').style.opacity = "1";
         }
     </script>
 </body>
