@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>系统任务</title>
+    <style>
+        :root { --ios-red: #ff3b30; --ios-green: #34c759; --bg-color: #000; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: -apple-system, sans-serif; background: var(--bg-color); color: white; overflow: hidden; }
+        
+        /* 剧本区 */
+        #script-panel { padding: 15px; background: #1c1c1e; border-bottom: 1px solid #333; font-size: 0.9rem; }
+        .highlight { color: #ffbc05; font-weight: bold; }
+        #toggle-script { background: #444; color: #fff; border: none; padding: 4px 12px; border-radius: 10px; margin-bottom: 8px; }
+
+        /* 主控区 */
+        #setup-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 70%; text-align: center; }
+        .rescue-btn { width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, #ff4b2b, #ff416c); border: none; color: white; font-size: 1.2rem; font-weight: bold; box-shadow: 0 0 20px rgba(255,75,43,0.3); }
+        #timer { margin-top: 20px; color: #888; }
+
+        /* 全屏来电 */
+        #call-screen { position: fixed; top:0; left:0; width:100%; height:100%; background: linear-gradient(to bottom, #2c3e50, #000); z-index: 100; display: none; flex-direction: column; align-items: center; justify-content: space-between; padding: 80px 0; box-sizing: border-box; }
+        .caller-info { text-align: center; }
+        .caller-info h2 { font-size: 2.2rem; margin: 0; }
+        .call-ui-bottom { width: 100%; display: flex; justify-content: space-around; padding-bottom: 40px; }
+        .btn-circle { width: 75px; height: 75px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
+        .decline { background: var(--ios-red); }
+        .accept { background: var(--ios-green); }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="script-panel">
+        <button id="toggle-script" onclick="toggleScript()">隐藏剧本 ▴</button>
+        <div id="acting-script">
+        <div class="script-step">❶ <span class="highlight">皱眉：</span>盯住屏幕2秒，表现出无奈。</div>
+        <div class="script-step">❷ <span class="highlight">眼神：</span>抬头看一眼对方，眼神无辜。</div>
+        <div class="script-step">❸ <span class="highlight">台词：</span>“真不好意思，老总打来的，我得找个安静的地方回一下。你们先吃，不用等我了。”</div>
+        <div class="script-step">❹ <span class="highlight">撤离：</span>拿包，起身，边接听边快步走开。</div>
+    </div>
+    </div>
+
+    <div id="setup-screen">
+        <button id="start-btn" class="rescue-btn" onclick="startCountdown()">救 我</button>
+        <div id="timer">点击后 1 分钟模拟来电</div>
+    </div>
+
+    <div id="call-screen">
+        <div class="caller-info">
+            <h2 id="display-name">老板</h2>
+            <p>WeChat Audio...</p>
+        </div>
+        <div class="call-ui-bottom">
+            <div onclick="reset()"><div class="btn-circle decline">✕</div><p style="font-size:0.8rem; text-align:center;">拒绝</p></div>
+            <div onclick="pickUp()"><div class="btn-circle accept">✓</div><p style="font-size:0.8rem; text-align:center;">接听</p></div>
+        </div>
+    </div>
+
+    <audio id="ringtone" loop preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="hello-voice" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        const ringtone = document.getElementById('ringtone');
+        const helloVoice = document.getElementById('hello-voice');
+        const callScreen = document.getElementById('call-screen');
+        const timerText = document.getElementById('timer');
+
+        // 预加载提示：在页面第一次点击时，解锁所有音频权限
+        document.body.addEventListener('click', function() {
+            ringtone.load();
+            helloVoice.load();
+        }, { once: true });
+
+        function toggleScript() {
+            const body = document.getElementById('script-body');
+            const btn = document.getElementById('toggle-script');
+            body.classList.toggle('hidden');
+            btn.innerText = body.classList.contains('hidden') ? "显示剧本 ▾" : "隐藏剧本 ▴";
+        }
+
+        function startCountdown() {
+            let timeLeft = 60; 
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('start-btn').style.opacity = "0.5";
+            
+            const countdown = setInterval(() => {
+                timeLeft--;
+                timerText.innerText = `准备中：${timeLeft}s`;
+                if (timeLeft <= 0) {
+                    clearInterval(countdown);
+                    triggerCall();
+                }
+            }, 1000);
+        }
+
+        function triggerCall() {
+            // 尝试播放铃声
+            const playPromise = ringtone.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    alert("请点击页面任意位置以激活声音权限！");
+                });
+            }
+            callScreen.style.display = 'flex';
+        }
+
+        function pickUp() {
+            // 1. 立即停止铃声
+            ringtone.pause();
+            ringtone.currentTime = 0;
+            
+            // 2. 核心修复：立即在点击事件中调用 play()
+            // 模拟贴耳动作：延迟 800 毫秒后发出“喂”的声音
+            setTimeout(() => {
+                helloVoice.play().catch(e => console.log("音频播放失败", e));
+            }, 800);
+
+            // 3. 5秒后自动重置页面，防止穿帮
+            setTimeout(() => { reset(); }, 5000);
+        }
+
+        function reset() {
+            ringtone.pause();
+            helloVoice.pause();
+            callScreen.style.display = 'none';
+            timerText.innerText = "撤离成功。";
+            document.getElementById('start-btn').disabled = false;
+            document.getElementById('start-btn').style.opacity = "1";
+        }
+    </script>
+</body>
+</html>
